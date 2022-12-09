@@ -9,6 +9,7 @@ from allauth.account.utils import setup_user_email
 from rest_framework import serializers
 from rest_auth.serializers import PasswordResetSerializer
 
+from home.models import App, Subscription, Plan
 
 User = get_user_model()
 
@@ -74,3 +75,104 @@ class UserSerializer(serializers.ModelSerializer):
 class PasswordSerializer(PasswordResetSerializer):
     """Custom serializer for rest_auth to solve reset password error"""
     password_reset_form_class = ResetPasswordForm
+
+
+class AppSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        max_length=50,
+        min_length=1
+    )
+
+    type = serializers.ChoiceField(
+        choices=App.TYPE_CHOICES,
+        initial=App.WEB,
+        required=True
+    )
+
+    framework = serializers.ChoiceField(
+        choices=App.FRAMEWORK_CHOICES,
+        initial=App.DJANGO,
+        required=True
+    )
+
+    subscription = serializers.SerializerMethodField(
+        required=False
+    )
+
+    def get_subscription(self, obj):
+        return None
+
+    class Meta:
+        model = App
+        fields = (
+            'id',
+            'name',
+            'description',
+            'type',
+            'framework',
+            'domain_name',
+            'screenshot',
+            'user',
+            'subscription',
+            'created_at',
+            'updated_at'
+        )
+
+        extra_kwargs = {}
+
+    def create(self, validated_data):
+        validated_data['user_id'] = self.context.get('request').user.id
+        app = App.objects.create(**validated_data)
+        return app
+
+    def update(self, instance, validated_data):
+        app = App.objects.filter(id=instance.id)
+        app.update(**validated_data)
+        return app.last()
+
+
+class AppPostSerializer(AppSerializer):
+    class Meta:
+        model = App
+        fields = (
+            'id',
+            'name',
+            'description',
+            'type',
+            'framework',
+            'domain_name',
+        )
+
+        extra_kwargs = {}
+
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    active = serializers.BooleanField(
+        required=True
+    )
+
+    def create(self, validated_data):
+        validated_data['user_id'] = self.context.get('request').user.id
+        subscription = Subscription.objects.create(**validated_data)
+        return subscription
+
+    def update(self, instance, validated_data):
+        subscription = Subscription.objects.filter(id=instance.id)
+        subscription.update(**validated_data)
+        return subscription.last()
+
+    class Meta:
+        model = Subscription
+        fields = '__all__'
+
+
+class SubscriptionPostSerializer(SubscriptionSerializer):
+    class Meta:
+        model = Subscription
+        fields = ('plan', 'app', 'active')
+
+
+class PlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Plan
+        fields = '__all__'
